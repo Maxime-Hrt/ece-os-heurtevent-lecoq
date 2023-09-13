@@ -10,7 +10,7 @@ how to execute a program from the command line:
 ```shell
 $ ./program
 ```
-## Questions:
+## Creating and Running a Process (1):
 *What happens after work a fork call? How are parent and child differentiated?
 After a fork system call is made, a new child process is created as a duplicate of the parent process. Here's what happens and how parent and child processes are differentiated*
 
@@ -97,6 +97,7 @@ int main() {
         sleep(3);
         printf("Parent value: %d\n", i);
     }
+    return 0;
 }
 ```
 **Output:**
@@ -107,4 +108,53 @@ Parent value: 5
 Child is executed before for the same reason as question above.
 
 -----------------
+*Is it possible to create more than one child process ? Show how
+using a simple program that creates 2 children for the 1st-level
+process (main parent) and a child for one of the 2nd-level
+processes (children).*
+```c
+int main() {
+    printf("1st-level parent process. PID: %d\n", getpid());
 
+    pid_t child1_pid = fork(); // Create the first child
+
+    if (child1_pid == 0) {
+        printf("1st-level child process 1. PID: %d, Parent PID: %d\n", getpid(), getppid());
+
+        pid_t grandchild_pid = fork(); // Create a child for the first child
+
+        if (grandchild_pid == 0) {
+            printf("2nd-level grandchild process. PID: %d, Parent PID: %d\n", getpid(), getppid());
+        }
+        return 0; // Exit the first child
+    }
+
+    pid_t child2_pid = fork(); // Create the second child
+
+    if (child2_pid == 0) {
+        printf("1st-level child process 2. PID: %d, Parent PID: %d\n", getpid(), getppid());
+    }
+
+    // Wait for all child processes to finish
+    for (int i = 0; i < 2; i++) {
+        wait(NULL);
+    }
+
+    return 0; // The main parent process exits
+}
+```
+`wait` is used to wait for state changes in a child of the calling process, 
+and obtain information about the child whose state has changed. 
+A state change is considered to be: the child terminated; the child was stopped 
+by a signal; or the child was resumed by a signal. In our case, we wait for a child to terminate.
+
+**Output:**
+```cli
+1st-level parent process. PID: 50154
+1st-level child process 1. PID: 50157, Parent PID: 50154
+1st-level child process 2. PID: 50158, Parent PID: 50154
+2nd-level grandchild process. PID: 50159, Parent PID: 50157
+```
+-----------------
+
+## Creating and Running a Process (2):
