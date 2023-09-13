@@ -369,3 +369,84 @@ If the function succeeds, it returns the exit status of the command executed.
    Use the «mySystem » function to implement the
    different options of your menu (except for quit of
    course).</i>
+   
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include "errno.h"
+
+int mySystem(const char *command);
+
+int main() {
+    int choice = 0;
+    char command[100];
+    char buffer;
+
+    while (choice != 5) {
+        //Display menu
+        printf("\n---Menu---\n");
+        printf("1. Run program\n");
+        printf("2. Kill a process\n");
+        printf("3. List the file in the current folder\n");
+        printf("4. Open application (On MacOS)\n");
+        printf("5. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        // Consommer le caractère de nouvelle ligne restant
+        while ((buffer = getchar()) != '\n' && buffer != EOF);
+
+        switch (choice) {
+            case 1:
+                printf("Enter the command name to run: ");
+                scanf("%[^\n]", command);
+                mySystem(command);
+                break;
+            case 2:
+                printf("Enter the process ID to kill: ");
+                int pid;
+                scanf("%d", &pid);
+                snprintf(command, sizeof(command), "kill %d", pid);
+                mySystem(command);
+                break;
+            case 3:
+                mySystem("ls");
+                break;
+            case 4:
+                printf("Enter the application name to open: ");
+                char app[100];
+                scanf("%[^\n]", app);
+                snprintf(command, sizeof(command), "/Applications/Figma.app/Contents/MacOS/%s", app);
+                mySystem(command);
+            case 5:
+                printf("Exiting...\n");
+                break;
+            default:
+                printf("Invalid choice, try again\n");
+        }
+    }
+    return 0;
+}
+```
+
+**Output:**
+```cli
+---Menu---
+1. Run program
+2. Kill a process
+3. List the file in the current folder
+4. Open application (On MacOS)
+5. Exit
+Enter your choice: 1
+Enter the command name to run: ls
+CMakeLists.txt          Lab - Processes.pdf     README.md               cmake-build-debug       main                    main.c
+```
+
+* `scanf(%[^\n], command)` is used to read a string with spaces until the condition defined after the `^`. In our case, we read a string until we reach a new line character.
+
+* ```c
+   while ((buffer = getchar()) != '\n' && buffer != EOF);
+   ```
+   This line is used to consume the newline character left in the buffer after the `scanf()` call.
+* `snprintf()` is used to write formatted output to the string pointed to by str. It is similar to `printf()` but it writes the output to a character string str rather than sending it to the screen. 
