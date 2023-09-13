@@ -310,3 +310,62 @@ So the first `printf()` statement before the `execlp()` call is not executed bec
 -----------------
 
 ## Writing your own Shell:
+The `system()` library function behaves as if it used fork(2) to
+create a child process that executed the shell command specified
+in command using execl(3) as follows:
+```c
+execl("/bin/sh", "sh", "-c", command, (char *) NULL);
+```
+`system()` returns after the command has been completed.
+
+*Implement your own system function (call it « mySystem »)*
+```c
+int mySystem(const char *command){
+    if (command == NULL || command[0] == '\0'){
+        return -1;
+    }
+
+    int status;
+    pid_t child_pid;
+
+    child_pid = fork();
+
+    //Error management
+    if (child_pid < 0){
+        perror("Fork failed");
+        printf("Error Code: %d\n", errno);
+    }
+
+    if (child_pid == 0) {
+        execl("bin/sh", "sh", "-c", command, NULL);
+        perror("Exec failed");
+        _exit(2);
+    } else {
+        waitpid(child_pid, &status, 0);
+
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status);
+        } else {
+            return -4;
+        }
+    }
+}
+```
+In the code above, we can see that we return the same error codes as `system()` function according to the documentation.
+If the function succeeds, it returns the exit status of the command executed. 
+
+* `waitpid()` is the same as `wait()` but it allows to specify which child process to wait for.
+* `WIFEXITED(status)` returns true if the child terminated normally, that is, by calling exit(3) or _exit(2), or by returning from main().
+* `WEXITSTATUS(status)` returns the exit status of the child. This consists of the least significant 8 bits of the status argument that the child specified in a call to exit(3) or _exit(2) or as the argument for a return statement in main(). This macro should only be employed if WIFEXITED returned true.
+* `errno` is a global variable that is set by system calls and some library functions in the event of an error to indicate what went wrong. It is defined in the header file errno.h.
+-----------------
+
+<i>Write a program that displays the following menu in a loop :
+   1. run a program
+   2. kill a process (hint : lookup the kill manual)
+   3. list the files in the current folder (hint :lookup the ls manual)
+   4. quit
+   
+   Use the «mySystem » function to implement the
+   different options of your menu (except for quit of
+   course).</i>
