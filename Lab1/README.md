@@ -233,5 +233,80 @@ int main() {
     return 0;
 }
 ```
+```cli
+$ gcc main.c -o main && ./main
+Parent process. PID: 60051
+Child process. PID: 60054
+INFO  [url_config] starting with app url: https://www.figma.com
+[fonts] read font_cache from disk.
+[fonts] found 446 paths on disk
+...
+```
 This code will open Figma application, and wait until the application is closed. It will print the parent process ID and the child process ID.
 *NB: The full path to Figma application may be different on your machine.*
+
+-----------------
+*Is data shared by the parent and child processes and to what
+extent ? Explain*
+
+**<u>Shared between Parent and Child Processes:</u>**
+
+**1. Program Code:** Initially, the child process shares the same program code (instructions) as the parent process. This means that both the parent and child start executing at the same point in the program.
+
+**2. Global Variables:** Global variables in the program are shared between the parent and child processes. Any changes made to these variables in one process will be visible to the other process.
+
+**3. Open File Descriptors:** If a file is opened by the parent process before forking, the child process inherits the open file descriptors. This allows both processes to read from or write to the same file.
+
+**4. Signal Handlers:** Signal handlers installed by the parent process are inherited by the child process.
+
+**5. Environment Variables:** Environment variables are shared, but processes can modify their own environment variables without affecting the other.
+
+**<u>Not Shared between Parent and Child Processes:</u>**
+
+**1. Process ID (PID):** Each process has a unique PID. The parent and child processes have different PIDs.
+
+**2.Stack:** Each process has its own stack. Changes made to the stack in one process do not affect the other.
+
+**3. Heap:** Processes have their own heap memory for dynamic memory allocation. Changes to the heap in one process do not affect the other.
+
+**4. File Descriptors:** File descriptors created after forking are not shared between parent and child processes. Each process has its own set of file descriptors.
+
+**5. Register Values and Program Counter:** The CPU register values (e.g., program counter) are independent in each process, so they can execute different instructions.
+
+**6. Resource Usage and Process State:** Each process has its own set of resource usage statistics (e.g., CPU time, memory usage) and process state (e.g., process status, exit status).
+
+**7. Parent Process ID (PPID):** The PPID of the child process is set to the PID of the parent process.
+
+-----------------
+
+*Explain what happens in the following program. What is the
+main difference with the previous version ?*
+```c
+int main() {
+    int status;
+    int i = 5;
+    if (fork() == 0){
+        execlp("echo", "echo", "Hello World", NULL);
+        perror("Exec failed");
+
+        printf("%c\n", i); //is this line executed? why?
+    } else {
+        printf("Process ID: %d\n", getpid());
+
+        wait(&status);
+    }
+    return 0;
+}
+```
+**Output:**
+```cli
+Process ID: 62299
+Hello World
+```
+`execlp()` replaces the current process image with a new process image.
+
+So the first `printf()` statement before the `execlp()` call is not executed because the execlp function replaces the current process image with the "echo" command, and any code that follows it is effectively unreachable
+
+-----------------
+
+## Writing your own Shell:
