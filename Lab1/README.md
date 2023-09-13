@@ -158,3 +158,80 @@ by a signal; or the child was resumed by a signal. In our case, we wait for a ch
 -----------------
 
 ## Creating and Running a Process (2):
+The `exec()` family of functions replaces the current process image
+with a new process image.
+
+**Functions used**:
+   - `execv()`: provides an array of pointers to null-terminated strings that represent the argument list available to the new program. The first argument, by convention, should point to the filename associated with the file being executed. The array of pointers must be terminated by a NULL pointer.
+   - `execvp()`: Same as `execv()` but the `execvp()` function does not use the PATH environment variable to find the executable file, so the file name must contain the full path name.
+
+**Executing a program using `execv()`**
+```c
+#include "stdio.h"
+#include "unistd.h"
+#include "sys/wait.h"
+
+int main() {
+    pid_t child_id;
+    int status;
+
+    child_id = fork();
+
+    if (child_id < 0) {
+        perror("Fork failed");
+    } else if (child_id == 0){
+        char *argv[4] = {"mkdir", "-p", "sample-dir", NULL};
+        execv("/bin/mkdir", argv);
+        perror("execv");
+    } else {
+        while ((wait(&status)) > 0);
+
+        char *argv[3] = {"touch", "sample-dir/sample-touch.txt", NULL};
+        execv("/usr/bin/touch", argv);
+        perror("execv");
+    }
+    return 0;
+}
+```
+This code will create a directory named `sample-dir` and wait until the directory is created. Then it will create a file named `sample-touch.txt` inside the directory.
+
+**Executing a program using `execvp()`**
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main() {
+    pid_t child_pid;
+    int status;
+
+    child_pid = fork();
+
+    if (child_pid == -1) {
+        perror("Fork failed");
+        return 1;
+    }
+
+    if (child_pid == 0) {
+        // This code runs in the child process
+        char *program = "/Applications/Figma.app/Contents/MacOS/figma"; // Specify the full path to Figma
+        char *args[] = {program, NULL};
+        execvp(program, args);
+
+        // If execvp() fails, it will reach this point
+        perror("Execvp failed");
+        return 1;
+    } else {
+        // This code runs in the parent process
+        printf("Parent process. PID: %d\n", getpid());
+        printf("Child process. PID: %d\n", child_pid);
+
+        // Wait for the child process to finish
+        wait(&status);
+    }
+
+    return 0;
+}
+```
+This code will open Figma application, and wait until the application is closed. It will print the parent process ID and the child process ID.
+*NB: The full path to Figma application may be different on your machine.*
