@@ -1,3 +1,22 @@
+# LAB 2: Sharing memory between processes
+
+## Prerequisites:
+how to compile a program from the command line:
+```shell
+$ gcc program.c -o program
+```
+how to execute a program from the command line:
+```shell
+$ ./program
+```
+## Shared memory:
+*Each process has its own distinct context and does not share it with other
+processes. Memory is where the context is and therefore, if two processes need to
+share an information in memory, they need to create this bit of space explicitly. In
+this lab, you’ll be expertimenting with the different system functions used to
+create such a shared space.*
+
+```c
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -29,3 +48,4 @@ int main(int argc, char **argv) {
         shmctl(id, IPC_RMID, NULL);
     }
 }
+```
