@@ -450,3 +450,144 @@ CMakeLists.txt          Lab - Processes.pdf     README.md               cmake-bu
    ```
    This line is used to consume the newline character left in the buffer after the `scanf()` call.
 * `snprintf()` is used to write formatted output to the string pointed to by str. It is similar to `printf()` but it writes the output to a character string str rather than sending it to the screen. 
+
+-----------------
+## Using Rust:
+If you already have Rust installed, you can skip this section.
+
+**Installing Rust on MacOS:**
+```shell
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+**Installing Rust on Linux:**
+```shell
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+**Installing Rust on Windows:**
+https://www.rust-lang.org/tools/install
+
+Run the following command to check if Rust is installed correctly:
+```shell
+$ rustc --version
+$ cargo --version
+```
+
+Run the following command to execute a Rust program:
+```shell
+rustc program.rs && ./program
+```
+
+Here the previous program written in Rust:
+```rust
+use std::io::{self, Write};
+use std::process::{Command, exit};
+
+fn my_system(command: &str) -> i32 {
+    if command.is_empty() {
+        return -1;
+    }
+
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output();
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                //Print output
+                io::stdout().write_all(&output.stdout).expect("Failed to write to stdout");
+                io::stderr().write_all(&output.stderr).expect("Failed to write to stderr");
+                return output.status.code().unwrap_or(0);
+            } else {
+                eprintln!("Command failed: {:?}", output.status);
+                return -4;
+            }
+        }
+        Err(e) => {
+            eprintln!("Error executing command: {}", e);
+            return -2;
+        }
+    }
+}
+
+fn main() {
+    let mut choice = String::new();
+    let mut command = String::new();
+
+    loop {
+        // Display menu
+        println!("\n---Menu---");
+        println!("1. Run program");
+        println!("2. Kill a process");
+        println!("3. List files in the current folder");
+        println!("4. Open application (On MacOS)");
+        println!("5. Exit");
+
+        print!("Enter your choice: ");
+        io::stdout().flush().expect("Failed to flush");
+
+        io::stdin().read_line(&mut choice).expect("Failed to read line");
+        choice = choice.trim().to_string();
+
+        match choice.as_str() {
+            "1" => {
+                print!("Enter the command name to run: ");
+                io::stdout().flush().expect("Failed to flush");
+                io::stdin().read_line(&mut command).expect("Failed to read line");
+                command = command.trim().to_string();
+                let result = my_system(&command);
+                println!("Command returned: {}", result);
+            }
+            "2" => {
+                print!("Enter the process ID to kill: ");
+                io::stdout().flush().expect("Failed to flush");
+                let mut pid = String::new();
+                io::stdin().read_line(&mut pid).expect("Failed to read line");
+                pid = pid.trim().to_string();
+                let command = format!("kill {}", pid);
+                let result = my_system(&command);
+                println!("Command returned: {}", result);
+            }
+            "3" => {
+                let result = my_system("ls");
+                println!("Command returned: {}", result);
+            }
+            "4" => {
+                print!("Enter the application name to open: ");
+                io::stdout().flush().expect("Failed to flush");
+                io::stdin().read_line(&mut command).expect("Failed to read line");
+                command = command.trim().to_string();
+                let command = format!("/Applications/Figma.app/Contents/MacOS/{}", command);
+                let result = my_system(&command);
+                println!("Command returned: {}", result);
+            }
+            "5" => {
+                println!("Exiting...");
+                exit(0);
+            }
+            _ => println!("Invalid choice, try again"),
+        }
+        choice.clear();
+        command.clear();
+    }
+}
+```
+
+**Functions explanation:**
+- `io::stdout().flush().expect("Failed to flush");` is used to flush the output buffer. This is necessary because Rust uses buffered output by default.
+- `io::stdin().read_line(&mut choice).expect("Failed to read line");` is used to read a line from the standard input and store it in the `choice` variable.
+- `choice = choice.trim().to_string();` is used to remove the newline character from the end of the string and convert it to a String.
+- `match choice.as_str() { ... }` is used to match the value of the `choice` variable with the different cases.
+- `format!("kill {}", pid)` is used to format a string. In this case, it will return a string with the value of the `pid` variable appended to the string `"kill "`.
+- `exit(0)` is used to exit the program with a status code of 0.
+- `eprintln!("Command failed: {:?}", output.status);` is used to print an error message to the standard error output.
+- `output.status.code().unwrap_or(0)` is used to get the exit code of the command. If the command failed, it will return 0.
+- `io::stdout().write_all(&output.stdout).expect("Failed to write to stdout");` is used to write the output of the command to the standard output.
+- `io::stderr().write_all(&output.stderr).expect("Failed to write to stderr");` is used to write the error output of the command to the standard error output.
+- `output.status.success()` is used to check if the command was executed successfully.
+- `output.status.code().unwrap_or(0)` is used to get the exit code of the command. If the command failed, it will return 0.
+
+In Rust, we don't need to explicitly create a child process (as with `fork()` in C) or use `wait()` to wait for a command to finish executing. The standard Rust library, via the `std::process::Command` module, handles this in a cleaner, more abstract way.
+
+When we use Command, it automatically creates a new process to execute the specified command. You can then wait for the child process to finish (or retrieve its output, if appropriate) using Command methods such as `.spawn()`, `.output()`, or `.status()`.
