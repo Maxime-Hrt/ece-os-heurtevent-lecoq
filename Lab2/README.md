@@ -255,3 +255,5 @@ The parent process reads the values of E and F, then it displays the result of t
 Then the parent process removes the shared memory segments with the function `shmctl()`.
 
 ---
+
+## Implementing Copy/Paste between processes:

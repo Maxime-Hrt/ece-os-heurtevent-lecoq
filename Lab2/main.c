@@ -79,7 +79,7 @@ int affectValue(const char *message) {
 
     scanResult = scanf("%d", &var);
     if (scanResult != 1) {
-        printf("ERROR NOT VALID INPUT");
+        printf("ERROR NOT VALID INPUT\n");
         exit(EXIT_FAILURE);
     }
     return var;

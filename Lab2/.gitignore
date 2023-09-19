@@ -1,3 +1,6 @@
 .idea
 sharing data between processes.pdf
 cmake-build-debug
+main
+process1
+process2
