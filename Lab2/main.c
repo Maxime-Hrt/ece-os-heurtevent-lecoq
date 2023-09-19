@@ -16,10 +16,10 @@ void handleShmctlError(int result, const char *message);
 
 int main() {
     int id_child, id_grandChild, status;
-    int a, b, c, d, e, f, result;
+    int a, b, c, d, e, f;
     int *p1, *p2;
 
-    system("ipcs -m");
+    system("ipcs -m"); // Display shared memory segments
     id_child = shmget(KEY_CHILD, sizeof(int), IPC_CREAT | PERMS);
     id_grandChild = shmget(KEY_GRANDCHILD, sizeof(int), IPC_CREAT | PERMS);
     system("ipcs -m");
@@ -69,8 +69,6 @@ int main() {
 
         handleShmctlError(shmctl(id_child, IPC_RMID, NULL), "SHMCTL ERROR CHILD");
     }
-
-    system("ipcs -m");
     return 0;
 }
 

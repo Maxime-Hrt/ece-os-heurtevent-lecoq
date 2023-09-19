@@ -109,3 +109,149 @@ Then we create a child process with the function `fork()`. The child process inc
 
 ---
 
+## Parallel Computing:
+*Write a program that computes the folowing expression “(a + b) * (c + d) * (e +
+f)” using 3 different processes.*
+
+```c
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <errno.h>
+
+#define KEY_CHILD 8888
+#define KEY_GRANDCHILD 9999
+#define PERMS 0660
+
+int affectValue(const char *message);
+void handleShmatError(int *pointer, const char *message);
+void handleShmctlError(int result, const char *message);
+
+int main() {
+    int id_child, id_grandChild, status;
+    int a, b, c, d, e, f, result;
+    int *p1, *p2;
+
+    system("ipcs -m");
+    id_child = shmget(KEY_CHILD, sizeof(int), IPC_CREAT | PERMS);
+    id_grandChild = shmget(KEY_GRANDCHILD, sizeof(int), IPC_CREAT | PERMS);
+    system("ipcs -m");
+
+    p1 = (int*) shmat(id_child, NULL, 0);
+    handleShmatError(p1, "SHMAT P1 ERROR");
+    p2 = (int*) shmat(id_grandChild, NULL, 0);
+    handleShmatError(p2, "SHMAT P2 ERROR");
+
+    pid_t child = fork();
+
+    // Error handling
+    if (child < 0) {
+        perror("child' Fork failed");
+        printf("Error code: %d", errno);
+    }
+
+    if (child == 0) {
+        pid_t grandChild = fork();
+        if (grandChild < 0) {
+            perror("'grandChild' Fork failed");
+            printf("Error code: %d", errno);
+        }
+
+        if (grandChild == 0) {
+            a = affectValue("Enter the \" A \" value");
+            b = affectValue("Enter the \" B \" value");
+            *p1 = a + b;
+            printf("A + B = %d\n", *p1);
+            exit(0);
+        } else {
+            waitpid(grandChild, &status, 0);
+            c = affectValue("Enter the \" C \" value");
+            d = affectValue("Enter the \" D \" value");
+            *p2 = c + d;
+            printf("C + D = %d\n", *p2);
+
+            handleShmctlError(shmctl(id_grandChild, IPC_RMID, NULL), "SHMCTL ERROR GRANDCHILD");
+        }
+    } else {
+        waitpid(child, &status, 0);
+        e = affectValue("Enter the \" E \" value");
+        f = affectValue("Enter the \" F \" value");
+        printf("E + F = %d\n", (e + f));
+        printf("======================\n");
+        printf("The result is %d\n", ((*p1) * (*p2) * (e + f)));
+
+        handleShmctlError(shmctl(id_child, IPC_RMID, NULL), "SHMCTL ERROR CHILD");
+    }
+    return 0;
+}
+
+int affectValue(const char *message) {
+    int var = 0;
+    int scanResult;
+    printf("%s: ",message);
+
+    scanResult = scanf("%d", &var);
+    if (scanResult != 1) {
+        printf("ERROR NOT VALID INPUT");
+        exit(EXIT_FAILURE);
+    }
+    return var;
+}
+
+void handleShmatError(int *pointer, const char *message) {
+    if (pointer == (int*)-1) {
+        perror(message);
+        exit(EXIT_FAILURE);
+    }
+}
+
+void handleShmctlError(int result, const char *message) {
+    if (result == -1) {
+        perror(message);
+    }
+}
+```
+**Output:**
+```cli
+IPC status from <running system> as of Wed Sep 20 01:30:53 CEST 2023
+T     ID     KEY        MODE       OWNER    GROUP
+Shared Memory:
+m 131072 0xca0f6571 --rw------- maxime_hrt    staff
+m 131073 0x510fe80b --rw------- maxime_hrt    staff
+
+IPC status from <running system> as of Wed Sep 20 01:30:53 CEST 2023
+T     ID     KEY        MODE       OWNER    GROUP
+Shared Memory:
+m 131072 0xca0f6571 --rw------- maxime_hrt    staff
+m 131073 0x510fe80b --rw------- maxime_hrt    staff
+m 393218 0x0000270f --rw-rw---- maxime_hrt    staff
+m 262147 0x000022b8 --rw-rw---- maxime_hrt    staff
+
+Enter the " A " value: 2
+Enter the " B " value: 8
+A + B = 10
+Enter the " C " value: 12
+Enter the " D " value: 13
+C + D = 25
+Enter the " E " value: 2
+Enter the " F " value: 2
+E + F = 4
+======================
+The result is 1000
+```
+
+First, we create two shared memory segments with the function `shmget()`.
+Then we attach the shared memory segments to the address space of the calling process with the function `shmat()`.
+Then we create a child process with the function `fork()`.
+The child process creates a grandchild process with the function `fork()`.
+The grandchild process reads the values of A and B, then it writes the sum of A and B to the shared memory segment.
+The child process waits for the grandchild process to terminate.
+The child process reads the values of C and D, then it writes the sum of C and D to the shared memory segment.
+The parent process waits for the child process to terminate.
+The parent process reads the values of E and F, then it displays the result of the expression “(a + b) * (c + d) * (e + f)”.
+Then the parent process removes the shared memory segments with the function `shmctl()`.
+
+---
