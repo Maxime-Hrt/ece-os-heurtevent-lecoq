@@ -1,7 +1,6 @@
 #include "stdio.h"
 #include "sys/ipc.h"
 #include "sys/msg.h"
-#include "string.h"
 
 #define MESSAGE_SIZE 256
 

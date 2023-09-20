@@ -257,3 +257,114 @@ Then the parent process removes the shared memory segments with the function `sh
 ---
 
 ## Implementing Copy/Paste between processes:
+*Create two independent executables ; Process 1 asks the user for input and the
+second one asks the user when to read the input from process 1, then displays it.*
+
+sender.c
+```c
+#include "stdio.h"
+#include "sys/ipc.h"
+#include "sys/msg.h"
+
+#define MESSAGE_SIZE 256
+
+struct message {
+    long mtype;
+    char mtext[MESSAGE_SIZE];
+};
+
+int main() {
+    key_t key;
+    int msgid;
+    struct message msg;
+
+    //Generate a unique key
+    key = ftok("sender.c", 'A');
+
+    //Get the message queue id
+    msgid = msgget(key, 0666 | IPC_CREAT);
+
+
+    msg.mtype = 1;
+    printf("Enter a message to send to receiver: ");
+    fgets(msg.mtext, MESSAGE_SIZE, stdin);
+
+    //Send the message
+    msgsnd(msgid, &msg, sizeof(msg), 0);
+
+    printf("Message sent to receiver: %s\n", msg.mtext);
+
+    return 0;
+}
+```
+receiver.c
+```c
+#include "stdio.h"
+#include "sys/ipc.h"
+#include "sys/msg.h"
+#include "string.h"
+
+#define MESSAGE_SIZE 256
+
+struct message {
+    long mtype;
+    char mtext[MESSAGE_SIZE];
+};
+
+int main() {
+    key_t key;
+    int msgid;
+    struct message msg;
+
+    //Get the key from the sender.c file
+    key = ftok("sender.c", 'A');
+
+    //Get the message queue id
+    msgid = msgget(key, 0666 | IPC_CREAT);
+
+    //Receive the message
+    msgrcv(msgid, &msg, sizeof(msg), 1, 0);
+
+    //Print the message
+    printf("Message received from sender: %s\n", msg.mtext);
+
+    //Remove the message queue
+    msgctl(msgid, IPC_RMID, NULL);
+
+    return 0;
+}
+```
+To execute the code you need to first compile the two files, then execute the **receiver first** and then the **sender in a different terminal**,
+write a message in the sender terminal and press enter, the message will be displayed in the receiver terminal.
+```shell
+$ gcc sender.c -o sender
+$ gcc receiver.c -o receiver
+$ ./receiver
+```
+```shell
+$ ./sender
+```
+
+
+*Sender output:*
+```cli
+Enter a message to send to receiver: SOSO
+Message sent to receiver: SOSO
+```
+*Receiver output:*
+```cli
+Message received from sender: SOSO
+```
+To achieve this, we used the message queue system. 
+The message queue system is a system that allows processes to communicate with each other by sending messages.
+
+Explanation of the `msg.h` and `ipc.h` library functions used in the code:
+* `ftok()`: generates a unique key. (from the `ipc.h` library)
+* `msgget()`: gets the message queue id. (from the `msg.h` library)
+* `msgsnd()`: sends a message. (from the `msg.h` library)
+* `msgrcv()`: receives a message. (from the `msg.h` library)
+* `msgctl()`: removes the message queue. (from the `msg.h` library)
+
+**message** structure is a convention used to send messages between processes. It contains two fields:
+* `mtype`: the type of the message.
+* `mtext`: the content of the message.
