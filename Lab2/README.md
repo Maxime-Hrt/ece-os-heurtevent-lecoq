@@ -345,7 +345,6 @@ $ ./receiver
 $ ./sender
 ```
 
-
 *Sender output:*
 ```cli
 Enter a message to send to receiver: SOSO
@@ -357,6 +356,16 @@ Message received from sender: SOSO
 ```
 To achieve this, we used the message queue system. 
 The message queue system is a system that allows processes to communicate with each other by sending messages.
+
+If we execute the `ipcs -q` between the two executions, we can see that the message queue is created by the sender.
+```shell
+$ ipcs -q
+```
+```cli
+Message Queues:
+q 262144 0x410f036c --rw-rw-rw- maxime_hrt    staff
+```
+
 
 Explanation of the `msg.h` and `ipc.h` library functions used in the code:
 * `ftok()`: generates a unique key. (from the `ipc.h` library)
