@@ -209,3 +209,103 @@ Then we create the first child process with the function `fork()`. The first chi
 ---
 
 ## Implementing Copy/Paste between processes:
+
+*Write a program that implements a copy/paste mechanism between two processes.
+
+The first process will read a string from the keyboard and will write it in a shared
+memory segment. The second process will read the string from the shared memory
+segment and will write it to the screen.*
+
+### Write program:
+
+```c
+// writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
+
+#define KEY 4568
+#define MAX_SIZE 256
+
+int main() {
+    char input[MAX_SIZE];
+
+    // Create shared memory segment
+    int shmid = shmget(KEY, MAX_SIZE, IPC_CREAT | 0666);
+    if (shmid == -1) {
+        perror("shmget");
+        exit(1);
+    }
+
+    char *shared_mem = (char *) shmat(shmid, NULL, 0);
+
+    printf("Enter your text: ");
+    fgets(input, MAX_SIZE, stdin);
+
+    strcpy(shared_mem, input);  // Copy the input to shared memory
+
+    printf("Text saved to shared memory. You can now read it from the other process.\n");
+
+    shmdt(shared_mem);
+
+    return 0;
+}
+```
+
+first we create the shared memory segment with the function `shmget()`. The first argument is the key of the shared memory segment. The second argument is the size of the shared memory segment. The third argument is the flags. The flags are used to specify the permissions of the shared memory segment. The function returns the ID of the shared memory segment.
+
+Then we attach the shared memory segment to the address space of the calling process with the function `shmat()`. The first argument is the ID of the shared memory segment. The second argument is the address of the shared memory segment. The third argument is the flags. The flags are used to specify the permissions of the shared memory segment. The function returns the address of the shared memory segment.
+
+Then we read the input from the keyboard with the function `fgets()`. The first argument is the string where the input will be stored. The second argument is the maximum number of characters to read. The third argument is the stream to read from. The function returns the string where the input has been stored.
+
+Then we copy the input to the shared memory segment with the function `strcpy()`. The first argument is the destination string. The second argument is the source string. The function returns the destination string.
+
+Then we detach from the shared memory segment with the function `shmdt()`. The first argument is the address of the shared memory segment.
+
+### Read program:
+
+```c
+// reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
+#include <string.h>
+
+#define KEY 4568
+#define MAX_SIZE 256
+
+int main() {
+    char command[MAX_SIZE];
+
+    printf("Type 'read' to fetch the text from shared memory: ");
+    fgets(command, MAX_SIZE, stdin);
+    command[strcspn(command, "\n")] = 0;  // Remove the newline character
+
+    if (strcmp(command, "read") == 0) {
+        int shmid = shmget(KEY, MAX_SIZE, 0666);
+        if (shmid == -1) {
+            perror("shmget");
+            exit(1);
+        }
+
+        char *shared_mem = (char *) shmat(shmid, NULL, 0);
+
+        printf("Fetched text: %s\n", shared_mem);
+
+        shmdt(shared_mem);
+    } else {
+        printf("Invalid command. Exiting.\n");
+    }
+
+    return 0;
+}
+```
+
+first we read the command from the keyboard with the function `fgets()`. The first argument is the string where the command will be stored. The second argument is the maximum number of characters to read. The third argument is the stream to read from. The function returns the string where the command has been stored.
+
+Then we remove the newline character from the command with the function `strcspn()`. The first argument is the string where the newline character will be removed. The second argument is the string containing the characters to remove. The function returns the string where the newline character has been removed.
+
+Then we compare the command with the string "read" with the function `strcmp()`. The first argument is the first string to compare. The second argument is the second string to compare. The function returns 0 if the strings are equal.
