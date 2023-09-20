@@ -1,99 +1,75 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <errno.h>
 
-#define KEY_CHILD 8888
-#define KEY_GRANDCHILD 9999
-#define PERMS 0660
-
-int affectValue(const char *message);
-void handleShmatError(int *pointer, const char *message);
-void handleShmctlError(int result, const char *message);
+#define KEY1 4568
+#define KEY2 4569
+#define KEY3 4570
 
 int main() {
-    int id_child, id_grandChild, status;
-    int a, b, c, d, e, f;
-    int *p1, *p2;
+    int a,b,c,d,e,f;
 
-    system("ipcs -m"); // Display shared memory segments
-    id_child = shmget(KEY_CHILD, sizeof(int), IPC_CREAT | PERMS);
-    id_grandChild = shmget(KEY_GRANDCHILD, sizeof(int), IPC_CREAT | PERMS);
-    system("ipcs -m");
+    // Input values for a, b, c, d, e, f using scanf
+    printf("Enter values for a, b, c, d, e, f: press enter to confirm each value\n");
+    scanf("%d %d %d %d %d %d", &a, &b, &c, &d, &e, &f);
 
-    p1 = (int*) shmat(id_child, NULL, 0);
-    handleShmatError(p1, "SHMAT P1 ERROR");
-    p2 = (int*) shmat(id_grandChild, NULL, 0);
-    handleShmatError(p2, "SHMAT P2 ERROR");
+    // Create shared memory segments
+    int id1 = shmget(KEY1, sizeof(int), IPC_CREAT | 0666);
+    int id2 = shmget(KEY2, sizeof(int), IPC_CREAT | 0666);
+    int id3 = shmget(KEY3, sizeof(int), IPC_CREAT | 0666);
 
-    pid_t child = fork();
+    pid_t first_fork = fork();
+    if (first_fork == 0) {
 
-    // Error handling
-    if (child < 0) {
-        perror("child' Fork failed");
-        printf("Error code: %d", errno);
-    }
+        pid_t second_fork = fork();
+        if (second_fork == 0) {
+            // Branch 2: Compute c + d
+            int *shared_result2 = (int *)shmat(id2, NULL, 0);
+            *shared_result2 = c + d;
+            printf("Branch 2: %d + %d = %d\n", c, d, *shared_result2);
 
-    if (child == 0) {
-        pid_t grandChild = fork();
-        if (grandChild < 0) {
-            perror("'grandChild' Fork failed");
-            printf("Error code: %d", errno);
-        }
-
-        if (grandChild == 0) {
-            a = affectValue("Enter the \" A \" value");
-            b = affectValue("Enter the \" B \" value");
-            *p1 = a + b;
-            printf("A + B = %d\n", *p1);
+            pid_t third_fork = fork();
+            if (third_fork == 0) {
+                // Branch 3: Compute e + f
+                int *shared_result3 = (int *)shmat(id3, NULL, 0);
+                *shared_result3 = e + f;
+                printf("Branch 3: %d + %d = %d\n", e, f, *shared_result3);
+                exit(0);
+            }
+            wait(NULL); // Wait for branch 3 to finish
             exit(0);
-        } else {
-            waitpid(grandChild, &status, 0);
-            c = affectValue("Enter the \" C \" value");
-            d = affectValue("Enter the \" D \" value");
-            *p2 = c + d;
-            printf("C + D = %d\n", *p2);
-
-            handleShmctlError(shmctl(id_grandChild, IPC_RMID, NULL), "SHMCTL ERROR GRANDCHILD");
         }
-    } else {
-        waitpid(child, &status, 0);
-        e = affectValue("Enter the \" E \" value");
-        f = affectValue("Enter the \" F \" value");
-        printf("E + F = %d\n", (e + f));
-        printf("======================\n");
-        printf("The result is %d\n", ((*p1) * (*p2) * (e + f)));
-
-        handleShmctlError(shmctl(id_child, IPC_RMID, NULL), "SHMCTL ERROR CHILD");
+        wait(NULL); // Wait for branch 2 to finish
+        exit(0);
+    }else{
+        // Branch 1: Compute a + b
+        int *shared_result1 = (int *)shmat(id1, NULL, 0);
+        *shared_result1 = a + b;
+        printf("Branch 1: %d + %d = %d\n", a, b, *shared_result1);
     }
+
+    // Wait for branch 1 (and therefore also 2 and 3) to finish
+    wait(NULL);
+
+    int *shared_result1 = (int *)shmat(id1, NULL, 0);
+    int *shared_result2 = (int *)shmat(id2, NULL, 0);
+    int *shared_result3 = (int *)shmat(id3, NULL, 0);
+
+    // Compute the final result
+    int final_result = (*shared_result1) * (*shared_result2) * (*shared_result3);
+    printf("Final result: (%d + %d) * (%d + %d) * (%d + %d) = %d\n", a, b, c, d, e, f, final_result);
+
+    // Detach from the shared memory segments
+    shmdt(shared_result1);
+    shmdt(shared_result2);
+    shmdt(shared_result3);
+
+    // Remove the shared memory segments
+    shmctl(id1, IPC_RMID, NULL);
+    shmctl(id2, IPC_RMID, NULL);
+    shmctl(id3, IPC_RMID, NULL);
+
     return 0;
-}
-
-int affectValue(const char *message) {
-    int var = 0;
-    int scanResult;
-    printf("%s: ",message);
-
-    scanResult = scanf("%d", &var);
-    if (scanResult != 1) {
-        printf("ERROR NOT VALID INPUT\n");
-        exit(EXIT_FAILURE);
-    }
-    return var;
-}
-
-void handleShmatError(int *pointer, const char *message) {
-    if (pointer == (int*)-1) {
-        perror(message);
-        exit(EXIT_FAILURE);
-    }
-}
-
-void handleShmctlError(int result, const char *message) {
-    if (result == -1) {
-        perror(message);
-    }
 }
