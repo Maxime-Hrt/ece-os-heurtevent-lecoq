@@ -198,5 +198,51 @@ Final value of i: 65
 The final value of `i` is 65 because the semaphore ensures that the two threads do not interleave. The increment function is executed first and it increases the value of `i` to 66, then the decrement function is executed and it decreases the value of `i` to 65. The semaphore ensures that the two threads do not interleave in a way that leads to the final value of `i` being 66 or 64.
 
 
+-----------------
+*What if we had more than two processes ? Is there something else to do to enforce
+mutual exclusion ? Explain and experiment using three processes.*
+
+1. add a third process that increments the variable
+2. run these tasks and display the final value of ‘i’
+
+add a third process that increments the variable
+```c
+pid_t pid2 = fork();
+if (pid2 == 0) {  // Child process
+    increment(&shared_data->i);
+    exit(0);
+} else if (pid2 > 0) {  // Parent process
+    decrement(&shared_data->i);
+    wait(NULL);  // Wait for child process to finish
+    wait(NULL);  // Wait for child process to finish
+    printf("Final value of i: %d\n", shared_data->i);  // Should print 65
+} else {
+    perror("fork");
+    exit(EXIT_FAILURE);
+}
+```
+
+run these tasks and display the final value of ‘i’
+```
+Final value of i: 66
+```
+
+**Increased Complexity:**
+
+With more than two processes, the complexity of interactions among processes increases. It becomes more challenging to predict the order in which the processes will access the shared memory.
+
+**Mutual Exclusion:**
+
+Mutual exclusion is crucial to ensure that each process accesses the shared memory atomically. Semaphores are an effective way to guarantee mutual exclusion, allowing only one process at a time to access the shared memory.
+
+**Experimentation:**
+
+In the experimentation with three processes, a semaphore was used to synchronize access to the shared variable `i`. Each process performed an increment or decrement operation on `i`.
+
+The sequence of operations was: increment, decrement, and then increment, leading to a final value of `i` of 66, which is consistent with the sequence of operations performed.
+
+-----------------
+
+
 
 

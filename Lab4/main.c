@@ -30,19 +30,32 @@ int main() {
     shared_data->i = 65;
     sem_init(&shared_data->sem, 1, 1);  // Initialize semaphore
 
-    pid_t pid = fork();
+    pid_t pid1 = fork();
+    pid_t pid2;
 
-    if (pid == 0) {  // Child process
+    if (pid1 == 0) {  // First child process
         sem_wait(&shared_data->sem);  // Acquire semaphore
         increment(&shared_data->i);
         sem_post(&shared_data->sem);  // Release semaphore
         exit(0);
-    } else if (pid > 0) {  // Parent process
-        sem_wait(&shared_data->sem);  // Acquire semaphore
-        decrement(&shared_data->i);
-        sem_post(&shared_data->sem);  // Release semaphore
-        wait(NULL);  // Wait for child process to finish
-        printf("Final value of i: %d\n", shared_data->i);  // Should print 65
+    } else if (pid1 > 0) {  // Parent process
+        pid2 = fork();
+        if (pid2 == 0) {  // Second child process
+            sem_wait(&shared_data->sem);  // Acquire semaphore
+            decrement(&shared_data->i);
+            sem_post(&shared_data->sem);  // Release semaphore
+            exit(0);
+        } else if (pid2 > 0) {  // Parent process
+            sem_wait(&shared_data->sem);  // Acquire semaphore
+            increment(&shared_data->i);
+            sem_post(&shared_data->sem);  // Release semaphore
+            wait(NULL);  // Wait for first child process to finish
+            wait(NULL);  // Wait for second child process to finish
+            printf("Final value of i: %d\n", shared_data->i);  // Should print 65
+        } else {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
     } else {
         perror("fork");
         exit(EXIT_FAILURE);
