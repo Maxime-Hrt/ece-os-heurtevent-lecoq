@@ -30,26 +30,39 @@ int i = 65;
 
 Create two tasks, one should increment the variable and the other one should decrement it
 ```c
-void increment(void *arg) {
-    int *i = (int *) arg;
-    *i = *i + 1;
+void increment(int *var) {
+        (*var)++;
 }
 
-void decrement(void *arg) {
-    int *i = (int *) arg;
-    *i = *i - 1;
+void decrement(int *var) {
+    (*var)--;
 }
 ```
 
 Run these tasks and display the final value of ‘i’
 ```c
 int main() {
-    pthread_t tid1, tid2;
-    pthread_create(&tid1, NULL, increment, &i);
-    pthread_create(&tid2, NULL, decrement, &i);
-    pthread_join(tid1, NULL);
-    pthread_join(tid2, NULL);
-    printf("i = %d\n", i);
+    key_t key = ftok("shmfile",65);
+    int shmid = shmget(key, sizeof(int), 0666|IPC_CREAT);
+    int *i = (int*) shmat(shmid, (void*)0, 0);
+    *i = 65;
+
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        increment(i);
+        shmdt(i);
+        return 0;
+    } else if (pid > 0) {
+        decrement(i);
+        wait(NULL);
+        printf("Final value of i: %d\n", *i);
+        shmctl(shmid, IPC_RMID, NULL);
+    } else {
+        printf("Fork failed!\n");
+        return 1;
+    }
+
     return 0;
 }
 ```
