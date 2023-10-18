@@ -31,7 +31,7 @@ int i = 65;
 Create two tasks, one should increment the variable and the other one should decrement it
 ```c
 void increment(int *var) {
-        (*var)++;
+    (*var)++;
 }
 
 void decrement(int *var) {
@@ -81,56 +81,6 @@ This does not adequately demonstrate the problem of the race condition that can 
 *Replace the previous tasks with the following instructions. Explain what
 needs to be done in order to achieve either error (64 or 65) at will.*
 
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-
-void increment(int *var) {
-    int reg = *var;
-    sleep(1);  // Introduce delay
-    reg++;
-    *var = reg;
-}
-
-void decrement(int *var) {
-    int reg = *var;
-    sleep(1);  // Introduce delay
-    reg--;
-    *var = reg;
-}
-
-int main() {
-    key_t key = ftok("shmfile",65);
-    int shmid = shmget(key, sizeof(int), 0666|IPC_CREAT);
-    int *i = (int*) shmat(shmid, (void*)0, 0);
-    *i = 65;
-
-    pid_t pid = fork();
-
-    if (pid == 0) {  // Child process
-        increment(i);
-        shmdt(i);
-        return 0;
-    } else if (pid > 0) {  // Parent process
-        decrement(i);
-        wait(NULL);  // Wait for child process to finish
-        printf("Final value of i: %d\n", *i);  // Could print 64, 65, or 66 depending on the order of operations
-        shmctl(shmid, IPC_RMID, NULL);
-    } else {
-        printf("Fork failed!\n");
-        return 1;
-    }
-
-    return 0;
-}
-
-```
-
 
 1. Introduce a delay in the increment and decrement functions
 2. Run the program and see the final value of `i`
@@ -169,4 +119,84 @@ Final value of i: 64
 ```
 
 The final value of `i` is 64 because the decrement function is executed first and it decreases the value of `i` to 64, then the increment function is executed and it increases the value of `i` to 65. The delay introduced in the increment and decrement functions allows the two threads to interleave in a way that leads to the final value of `i` being 64.
+
+
+-----------------
+
+## Solving the Problem : Synchronizing access using semaphores (2):
+
+*Use semaphores to enforce mutual exclusion and solve the race problem in the first exercise
+(sem_init (sem_open for macOS users), sem_wait, sem_post)*
+
+1. initialize a semaphore with value 1
+2. create two tasks, one should increment the variable and the other one should decrement it
+3. run these tasks and display the final value of ‘i’
+
+initialize a semaphore with value 1
+```c
+typedef struct {
+    int i;
+    sem_t sem;
+} shared_data_t;
+
+sem_init(&shared_data->sem, 1, 1);  // Initialize semaphore
+```
+
+create two tasks, one should increment the variable and the other one should decrement it
+```c
+void increment(shared_data_t *shared_data) {
+    sem_wait(&shared_data->sem);  // Wait for semaphore
+    shared_data->i++;
+    sem_post(&shared_data->sem);  // Signal semaphore
+}
+
+void decrement(shared_data_t *shared_data) {
+    sem_wait(&shared_data->sem);  // Wait for semaphore
+    shared_data->i--;
+    sem_post(&shared_data->sem);  // Signal semaphore
+}
+```
+
+run these tasks and display the final value of ‘i’
+```c
+int main() {
+    // Create shared memory segment
+    shared_data_t *shared_data = mmap(NULL, sizeof(shared_data_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (shared_data == MAP_FAILED) {
+        perror("mmap");
+        exit(EXIT_FAILURE);
+    }
+
+    shared_data->i = 65;
+    sem_init(&shared_data->sem, 1, 1);  // Initialize semaphore
+
+    pid_t pid = fork();
+
+    if (pid == 0) {  // Child process
+        increment(&shared_data->i);
+        exit(0);
+    } else if (pid > 0) {  // Parent process
+        decrement(&shared_data->i);
+        wait(NULL);  // Wait for child process to finish
+        printf("Final value of i: %d\n", shared_data->i);  // Should print 65
+    } else {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    sem_destroy(&shared_data->sem);  // Destroy semaphore
+    munmap(shared_data, sizeof(shared_data_t));  // Unmap shared memory
+    return 0;
+}
+```
+
+the result of the execution of the program is:
+```
+Final value of i: 65
+```
+
+The final value of `i` is 65 because the semaphore ensures that the two threads do not interleave. The increment function is executed first and it increases the value of `i` to 66, then the decrement function is executed and it decreases the value of `i` to 65. The semaphore ensures that the two threads do not interleave in a way that leads to the final value of `i` being 66 or 64.
+
+
+
 
