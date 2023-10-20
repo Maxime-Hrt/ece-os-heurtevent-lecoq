@@ -572,3 +572,102 @@ Launching VoiceMemos
 The applications are launched in the correct order.
 
 -----------------
+<i>Use sempahores to implement the following parallelized calculation (a+b)*(c-d)*(e+f)
+- T1 runs (a+b) and stores the result in a shared table (1st available spot)
+- T2 runs (c+d) and stores the result in a shared table (1st available spot)
+- T3 runs (e+f) and stores the result in a shared table (1st available spot)
+- T4 waits for two tasks to end and does the corresponding calculation
+- T4 waits for the remaining task to end and does the final calculation then displays the result</i>
+
+1. Add result in shared data struct
+2. Create 3 calculations tasks
+3. Create 1 result task
+4. Run the program
+
+Add result in shared data struct:
+```c
+// Struct to hold shared data
+struct shared_data {
+#ifdef __APPLE__
+    dispatch_semaphore_t sem1;
+    dispatch_semaphore_t sem2;
+    dispatch_semaphore_t sem3;
+#else
+    sem_t sem1;
+    sem_t sem2;
+    sem_t sem3;
+#endif
+    int result[3];
+};
+```
+Add result in shared data struct to keep track of the results.
+
+Create 3 calculations tasks:
+```c
+void task1(struct shared_data *s, float a, float b) {
+    float result = a + b;
+    s->results[0] = result;
+    shared_data_post(s, s->sem2);  // Signal next task
+}
+
+void task2(struct shared_data *s, float c, float d) {
+    shared_data_wait(s, s->sem2);
+    float result = c - d;
+    s->results[1] = result;
+    shared_data_post(s, s->sem3);  // Signal next task
+}
+
+void task3(struct shared_data *s, float e, float f) {
+    shared_data_wait(s, s->sem3);
+    float result = e + f;
+    s->results[2] = result;
+}
+```
+Every task waits for the previous task to finish before starting. The result of each task is stored in the shared data struct.
+
+Create 1 result task:
+```c
+void task4(struct shared_data *s) {
+    shared_data_wait(s, s->sem2);
+    shared_data_wait(s, s->sem3);
+    float intermediate = s->results[0] * s->results[1];
+    float final_result = intermediate * s->results[2];
+    s->results[3] = final_result;
+    printf("Final Result: %f\n", final_result);
+}
+```
+The result task waits for the previous two tasks to finish before starting. It then calculates the final result and prints it.
+
+Run the program:
+```c
+pid_t pid1 = fork();
+    if (pid1 == 0) {
+        task1(shared_data, 1.0, 2.0);  // Replace with your values for a and b
+        exit(0);
+    }
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        task2(shared_data, 3.0, 4.0);  // Replace with your values for c and d
+        exit(0);
+    }
+    pid_t pid3 = fork();
+    if (pid3 == 0) {
+        task3(shared_data, 5.0, 6.0);  // Replace with your values for e and f
+        exit(0);
+    }
+    pid_t pid4 = fork();
+    if (pid4 == 0) {
+        task4(shared_data);
+        exit(0);
+    }
+
+    waitpid(pid1, &status, 0);
+    waitpid(pid2, &status, 0);
+    waitpid(pid3, &status, 0);
+    waitpid(pid4, &status, 0);
+```
+```cli
+Final Result: -33.000000
+```
+The final result is calculated correctly.
+

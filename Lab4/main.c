@@ -24,9 +24,7 @@ struct shared_data {
     sem_t sem2;
     sem_t sem3;
 #endif
-    pid_t pid_firefox;
-    pid_t pid_emacs;
-    pid_t pid_vi;
+    float results[4];
 };
 
 // Init function
@@ -82,9 +80,10 @@ shared_data_end(struct shared_data *s) {
 }
 /// ========= END MACOS SETUP ========= ///
 
-void process1(struct shared_data *s);
-void process2(struct shared_data *s);
-void process3(struct shared_data *s);
+void task1(struct shared_data *s, float a, float b);
+void task2(struct shared_data *s, float c, float d);
+void task3(struct shared_data *s, float e, float f);
+void task4(struct shared_data *s);
 
 int main() {
     int status;
@@ -97,69 +96,60 @@ int main() {
     shared_data_init(shared_data, 1);
 
     pid_t pid1 = fork();
-
     if (pid1 == 0) {
-        process1(shared_data);
+        task1(shared_data, 1.0, 2.0);  // Replace with your values for a and b
         exit(0);
-    } else {
-        pid_t pid2 = fork();
-        if (pid2 == 0) {
-            process2(shared_data);
-            exit(0);
-        } else {
-            pid_t pid3 = fork();
-            if (pid3 == 0) {
-                process3(shared_data);
-                exit(0);
-            } else if (pid3 > 0) {
-                waitpid(pid3, &status, 0);
-            } else {
-                perror("fork");
-                exit(EXIT_FAILURE);
-            }
-            waitpid(pid2, &status, 0);
-        }
-        waitpid(pid1, &status, 0);
     }
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        task2(shared_data, 3.0, 4.0);  // Replace with your values for c and d
+        exit(0);
+    }
+    pid_t pid3 = fork();
+    if (pid3 == 0) {
+        task3(shared_data, 5.0, 6.0);  // Replace with your values for e and f
+        exit(0);
+    }
+    pid_t pid4 = fork();
+    if (pid4 == 0) {
+        task4(shared_data);
+        exit(0);
+    }
+
+    waitpid(pid1, &status, 0);
+    waitpid(pid2, &status, 0);
+    waitpid(pid3, &status, 0);
+    waitpid(pid4, &status, 0);
 
     shared_data_end(shared_data);
     munmap(shared_data, sizeof(struct shared_data));
     return 0;
 }
 
-void process1(struct shared_data *s) {
-    shared_data_wait(s, s->sem1);
-    printf("Launching Figma\n");
-    s->pid_firefox = fork();
-    if (s->pid_firefox == 0) {
-        execlp("/Applications/Figma.app/Contents/MacOS/Figma", "figma", NULL);
-        perror("Failed to launch Firefox");
-        exit(EXIT_FAILURE);
-    }
-    shared_data_wait(s, s->sem2);
+void task1(struct shared_data *s, float a, float b) {
+    float result = a + b;
+    s->results[0] = result;
+    shared_data_post(s, s->sem2);  // Signal next task
 }
 
-void process2(struct shared_data *s) {
+void task2(struct shared_data *s, float c, float d) {
     shared_data_wait(s, s->sem2);
-    printf("Launching Calculator\n");
-    s->pid_emacs = fork();
-    if (s->pid_emacs == 0) {
-        execlp("/System/Applications/Calculator.app/Contents/MacOS/Calculator", "calculator", NULL);
-        perror("Failed to launch Emacs");
-        exit(EXIT_FAILURE);
-    }
-    shared_data_post(s, s->sem3);
+    float result = c - d;
+    s->results[1] = result;
+    shared_data_post(s, s->sem3);  // Signal next task
 }
 
-void process3(struct shared_data *s) {
+void task3(struct shared_data *s, float e, float f) {
     shared_data_wait(s, s->sem3);
-    printf("Launching VoiceMemos\n");
-    s->pid_vi = fork();
-    if (s->pid_vi == 0) {
-        // Link might to be changed depending on the OS
-        execlp("/System/Applications/VoiceMemos.app/Contents/MacOS/VoiceMemos", "voicememo", NULL);
-        perror("Failed to launch Vi");
-        exit(EXIT_FAILURE);
-    }
+    float result = e + f;
+    s->results[2] = result;
 }
 
+void task4(struct shared_data *s) {
+    shared_data_wait(s, s->sem2);
+    shared_data_wait(s, s->sem3);
+    float intermediate = s->results[0] * s->results[1];
+    float final_result = intermediate * s->results[2];
+    s->results[3] = final_result;
+    printf("Final Result: %f\n", final_result);
+}
