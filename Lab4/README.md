@@ -333,3 +333,164 @@ Mutual exclusion is crucial to ensure that each process accesses the shared memo
 In the experimentation with three processes, a semaphore was used to synchronize access to the shared variable `i`. Each process performed an increment or decrement operation on `i`.
 The sequence of operations was: decrement, increment, and then decrement, leading to a final value of `i` of 64, which is consistent with the sequence of operations performed.
 -----------------
+
+*A deadlock is a situation in which a process is waiting for some resource held by another
+process waiting for it to release another resource, thereby forming a loop of blocked
+processes ! Use semaphores to force a deadlock situation using three processes.*
+
+1. Adapt OS setup to **MacOS** & other **OS**
+2. Create 3 processes
+3. Set up a deadlock situation
+4. Run the program
+
+Adapt OS setup to **MacOS** & other **OS**:
+```c
+#ifdef __APPLE__
+#include <dispatch/dispatch.h>
+#else
+#include <semaphore.h>
+#include <errno.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#endif
+
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+
+/// ========= MACOS SETUP ========= ///
+// Struct to hold shared data
+struct shared_data {
+#ifdef __APPLE__
+    dispatch_semaphore_t sem1;
+    dispatch_semaphore_t sem2;
+    dispatch_semaphore_t sem3;
+#else
+    sem_t sem1;
+    sem_t sem2;
+    sem_t sem3;
+#endif
+};
+
+// Init function
+static inline void
+shared_data_init(struct shared_data *s, int mutualExclusion) {
+#ifdef __APPLE__
+    s->sem1 = dispatch_semaphore_create(1);
+    s->sem2 = dispatch_semaphore_create(1);
+    s->sem3 = dispatch_semaphore_create(1);
+#else
+    sem_init(&s->sem1, mutualExclusion, value);
+    sem_init(&s->sem2, mutualExclusion, value);
+    sem_init(&s->sem3, mutualExclusion, value);
+#endif
+}
+
+// Wait function
+static inline void
+shared_data_wait(struct shared_data *s, dispatch_semaphore_t sem) {
+#ifdef __APPLE__
+    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+#else
+    int r;
+
+    do {
+        r = sem_wait(&s->sem);
+    } while (r == -1 && errno == EINTR);
+#endif
+}
+
+// Post function
+static inline void
+shared_data_post(struct shared_data *s, dispatch_semaphore_t sem) {
+#ifdef __APPLE__
+    dispatch_semaphore_signal(sem);
+#else
+    sem_post(&s->sem);
+#endif
+}
+
+// Destroy function
+static inline void
+shared_data_end(struct shared_data *s) {
+#ifdef __APPLE__
+    dispatch_release(s->sem1);
+    dispatch_release(s->sem2);
+    dispatch_release(s->sem3);
+#else
+    sem_destroy(&s->sem1);
+    sem_destroy(&s->sem2);
+    sem_destroy(&s->sem3);
+#endif
+}
+/// ========= END MACOS SETUP ========= ///
+```
+Set up adapted to use 3 semaphores instead of 1.
+
+Create 3 processes:
+```c
+void process1(struct shared_data *s) {
+    shared_data_wait(s, s->sem1);
+    printf("Process 1 acquired sem1\n");
+    printf("Process 1 waiting for sem2\n");
+    shared_data_wait(s, s->sem2);
+}
+
+void process2(struct shared_data *s) {
+    shared_data_wait(s, s->sem2);
+    printf("Process 2 acquired sem2\n");
+    printf("Process 2 waiting for sem3\n");
+    shared_data_wait(s, s->sem3);
+}
+
+void process3(struct shared_data *s) {
+    shared_data_wait(s, s->sem3);
+    printf("Process 3 acquired sem3\n");
+    printf("Process 3 waiting for sem1\n");
+    shared_data_wait(s, s->sem1);
+}
+```
+Creation of processes that wait for each other to release a semaphore.
+
+Set up a deadlock situation:
+```c
+pid_t pid1 = fork();
+
+    if (pid1 == 0) {
+        process1(shared_data);
+        exit(0);
+    } else {
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            process2(shared_data);
+            exit(0);
+        } else {
+            pid_t pid3 = fork();
+            if (pid3 == 0) {
+                process3(shared_data);
+                exit(0);
+            } else if (pid3 > 0) {
+                waitpid(pid3, &status, 0);
+            } else {
+                perror("fork");
+                exit(EXIT_FAILURE);
+            }
+            waitpid(pid2, &status, 0);
+        }
+        waitpid(pid1, &status, 0);
+    }
+```
+The deadlock situation is created by having each process wait for a semaphore that is held by another process. 
+
+Run the program:
+```cli
+Process 1 acquired sem1
+Process 1 waiting for sem2
+Process 2 acquired sem2
+Process 2 waiting for sem3
+Process 3 acquired sem3
+Process 3 waiting for sem1
+```
+This is a deadlock situation because none of the processes can proceed without the other processes releasing the semaphores they are waiting for.
+
