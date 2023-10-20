@@ -24,6 +24,9 @@ struct shared_data {
     sem_t sem2;
     sem_t sem3;
 #endif
+    pid_t pid_firefox;
+    pid_t pid_emacs;
+    pid_t pid_vi;
 };
 
 // Init function
@@ -126,21 +129,37 @@ int main() {
 
 void process1(struct shared_data *s) {
     shared_data_wait(s, s->sem1);
-    printf("Process 1 acquired sem1\n");
-    printf("Process 1 waiting for sem2\n");
-    shared_data_wait(s, s->sem2);  // This will cause deadlock
+    printf("Launching Figma\n");
+    s->pid_firefox = fork();
+    if (s->pid_firefox == 0) {
+        execlp("/Applications/Figma.app/Contents/MacOS/Figma", "figma", NULL);
+        perror("Failed to launch Firefox");
+        exit(EXIT_FAILURE);
+    }
+    shared_data_wait(s, s->sem2);
 }
 
 void process2(struct shared_data *s) {
     shared_data_wait(s, s->sem2);
-    printf("Process 2 acquired sem2\n");
-    printf("Process 2 waiting for sem3\n");
-    shared_data_wait(s, s->sem3);  // This will cause deadlock
+    printf("Launching Calculator\n");
+    s->pid_emacs = fork();
+    if (s->pid_emacs == 0) {
+        execlp("/System/Applications/Calculator.app/Contents/MacOS/Calculator", "calculator", NULL);
+        perror("Failed to launch Emacs");
+        exit(EXIT_FAILURE);
+    }
+    shared_data_post(s, s->sem3);
 }
 
 void process3(struct shared_data *s) {
     shared_data_wait(s, s->sem3);
-    printf("Process 3 acquired sem3\n");
-    printf("Process 3 waiting for sem1\n");
-    shared_data_wait(s, s->sem1);  // This will cause deadlock
+    printf("Launching VoiceMemos\n");
+    s->pid_vi = fork();
+    if (s->pid_vi == 0) {
+        // Link might to be changed depending on the OS
+        execlp("/System/Applications/VoiceMemos.app/Contents/MacOS/VoiceMemos", "voicememo", NULL);
+        perror("Failed to launch Vi");
+        exit(EXIT_FAILURE);
+    }
 }
+

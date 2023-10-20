@@ -494,3 +494,81 @@ Process 3 waiting for sem1
 ```
 This is a deadlock situation because none of the processes can proceed without the other processes releasing the semaphores they are waiting for.
 
+---
+
+*Use semaphores to run 3 different applications (firefox, emacs, vi) in a predefined sequence
+no matter in which order they are launched.*
+
+1. Add pid in shared data struct
+2. Create 3 processes
+3. Run the program
+
+Add pid in shared data struct:
+```c
+// Struct to hold shared data
+struct shared_data {
+#ifdef __APPLE__
+    dispatch_semaphore_t sem1;
+    dispatch_semaphore_t sem2;
+    dispatch_semaphore_t sem3;
+#else
+    sem_t sem1;
+    sem_t sem2;
+    sem_t sem3;
+#endif
+    pid_t pid_firefox;
+    pid_t pid_emacs;
+    pid_t pid_vi;
+};
+```
+Add pid in shared data struct to keep track of the processes.
+
+Create 3 processes:
+```c
+void process1(struct shared_data *s) {
+    shared_data_wait(s, s->sem1);
+    printf("Launching Figma\n");
+    s->pid_firefox = fork();
+    if (s->pid_firefox == 0) {
+        execlp("/Applications/Figma.app/Contents/MacOS/Figma", "figma", NULL);
+        perror("Failed to launch Firefox");
+        exit(EXIT_FAILURE);
+    }
+    shared_data_wait(s, s->sem2);
+}
+
+void process2(struct shared_data *s) {
+    shared_data_wait(s, s->sem2);
+    printf("Launching Calculator\n");
+    s->pid_emacs = fork();
+    if (s->pid_emacs == 0) {
+        execlp("/System/Applications/Calculator.app/Contents/MacOS/Calculator", "calculator", NULL);
+        perror("Failed to launch Emacs");
+        exit(EXIT_FAILURE);
+    }
+    shared_data_post(s, s->sem3);
+}
+
+void process3(struct shared_data *s) {
+    shared_data_wait(s, s->sem3);
+    printf("Launching VoiceMemos\n");
+    s->pid_vi = fork();
+    if (s->pid_vi == 0) {
+        // Link might to be changed depending on the OS
+        execlp("/System/Applications/VoiceMemos.app/Contents/MacOS/VoiceMemos", "voicememo", NULL);
+        perror("Failed to launch Vi");
+        exit(EXIT_FAILURE);
+    }
+}
+```
+Same processes as before but with the addition of launching applications.
+
+Run the program:
+```cli
+Launching Figma
+Launching Calculator
+Launching VoiceMemos
+```
+The applications are launched in the correct order.
+
+-----------------
