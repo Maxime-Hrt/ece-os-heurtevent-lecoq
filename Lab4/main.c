@@ -82,13 +82,22 @@ int main() {
     }
 
     shared_data->i = 65;
-    shared_data_init(shared_data, 1, 1); // 1 = mutual exclusion, 1 = initial value
+    shared_data_init(shared_data, 1, 1);
 
     pid_t pid = fork();
 
     if (pid == 0) {
-        increment(shared_data); // Why shared_data->i and not shared_data?  => Because we want to increment the value of i and not the address of i
-        exit(0);
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            increment(shared_data);
+            exit(0);
+        } else if (pid2 > 0) {
+            decrement(shared_data);
+            waitpid(pid2, &status, 0);
+        } else {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
     } else if (pid > 0) {
         decrement(shared_data);
         waitpid(pid, &status, 0);

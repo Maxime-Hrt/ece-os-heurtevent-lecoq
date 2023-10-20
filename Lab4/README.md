@@ -283,4 +283,53 @@ Next, a child process is created using `fork`. The child process calls the `incr
 The parent process calls the `decrement` function and waits for the child process to finish. Then it prints the final value of `i`.
 Finally, the semaphore is destroyed and the shared memory region is unmapped.
 
+
+
+-----------------
+*What if we had more than two processes ? Is there something else to do to enforce
+mutual exclusion ? Explain and experiment using three processes.*
+
+1. add a third process that increments the variable
+2. run these tasks and display the final value of ‘i’
+
+Add a third process that increments the variable
+```c
+pid_t pid = fork();
+
+    if (pid == 0) {
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            increment(shared_data);
+            exit(0);
+        } else if (pid2 > 0) {
+            decrement(shared_data);
+            waitpid(pid2, &status, 0);
+        } else {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
+    } else if (pid > 0) {
+        decrement(shared_data);
+        waitpid(pid, &status, 0);
+        printf("The value of i is: %d\n", shared_data->i);
+    } else {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+```
+```
+Final value of i: 64
+```
+
+Run these tasks and display the final value of ‘i’
+
+<u>**Increased Complexity:**</u>
+With more than two processes, the complexity of interactions among processes increases. It becomes more challenging to predict the order in which the processes will access the shared memory.
+
+<u>**Mutual Exclusion:**</u>
+Mutual exclusion is crucial to ensure that each process accesses the shared memory atomically. Semaphores are an effective way to guarantee mutual exclusion, allowing only one process at a time to access the shared memory.
+
+<u>**Experimentation:**</u>
+In the experimentation with three processes, a semaphore was used to synchronize access to the shared variable `i`. Each process performed an increment or decrement operation on `i`.
+The sequence of operations was: decrement, increment, and then decrement, leading to a final value of `i` of 64, which is consistent with the sequence of operations performed.
 -----------------
